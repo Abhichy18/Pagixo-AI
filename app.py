@@ -294,3 +294,90 @@ def inference_with_api(image_path, prompt, sys_prompt="You are a precise documen
         raise Exception(f"API Inference failed: {str(e)}")
 
 def plot_text_bounding_boxes(image_path, bounding_boxes):
+    """
+    Plots bounding boxes on an image with markers for each a name, using PIL, normalized coordinates.
+    """
+    # Load the image
+    img = Image.open(image_path)
+    width, height = img.size
+    
+    # Create a drawing object
+    draw = ImageDraw.Draw(img)
+
+    # Parsing out the markdown fencing
+    bounding_boxes_json = parse_json(bounding_boxes)
+
+    # Calculate dynamic font size based on image dimensions
+    dynamic_size = max(16, int(height * 0.025))
+    try:
+        font = ImageFont.truetype("arial.ttf", size=dynamic_size)
+    except:
+        font = ImageFont.load_default()
+
+    # Iterate over the bounding boxes
+    try:
+        # Some free models forget to double-escape backslashes in JSON
+        fixed_json = re.sub(r'(?<!\\)\\(?![\\"/bfnrtu])', r'\\\\', bounding_boxes_json)
+        boxes = ast.literal_eval(fixed_json)
+    except Exception:
+        try:
+            boxes = json.loads(fixed_json, strict=False)
+        except Exception:
+            # Ultimate Fallback: Regex Parsing
+            boxes = []
+            blocks = re.findall(r'\{[^{}]*\}', bounding_boxes_json)
+            for block in blocks:
+                bbox_match = re.search(r'"bbox_2d"\s*:\s*\[([^\]]+)\]', block)
+                text_match = re.search(r'"text(?:_content)?"\s*:\s*"([^"]+)"', block)
+                if bbox_match and text_match:
+                    try:
+                        coords = [int(float(x.strip())) for x in bbox_match.group(1).split(',')]
+                        txt = text_match.group(1).replace('\\\\', '\\').replace('\\"', '"')
+                        boxes.append({"bbox_2d": coords, "text_content": txt})
+                    except Exception:
+                        pass
+            if not boxes:
+                st.error(f"Failed to parse JSON response completely.\n\nRaw Output: {bounding_boxes_json}")
+                return img
+
+    boxes = normalize_boxes(boxes)
+
+    # Convert img to RGBA to support transparent fills
+    img = img.convert('RGBA')
+    overlay = Image.new('RGBA', img.size, (0,0,0,0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    text_draw = ImageDraw.Draw(img)
+
+    for i, bounding_box in enumerate(boxes):
+        # Fetch coordinates - the API normalizes them between 0 and 1000
+        bbox_2d = bounding_box.get("bbox_2d", bounding_box.get("box_2d", None))
+        
+        if bbox_2d and len(bbox_2d) >= 4:
+            # Format: [xmin, ymin, xmax, ymax] normalized to 1000
+            abs_x1 = int(bbox_2d[0] / 1000.0 * width)
+            abs_y1 = int(bbox_2d[1] / 1000.0 * height)
+            abs_x2 = int(bbox_2d[2] / 1000.0 * width)
+            abs_y2 = int(bbox_2d[3] / 1000.0 * height)
+
+            if abs_x1 > abs_x2:
+                abs_x1, abs_x2 = abs_x2, abs_x1
+
+            if abs_y1 > abs_y2:
+                abs_y1, abs_y2 = abs_y2, abs_y1
+
+            # Draw a beautiful semi-transparent green bounding box
+            overlay_draw.rectangle(
+                ((abs_x1, abs_y1), (abs_x2, abs_y2)), 
+                outline=(0, 255, 0, 255),  # Solid Lime Green
+                width=max(2, int(height * 0.003)), 
+                fill=(0, 255, 0, 40)       # 15% opacity Green fill
+            )
+
+            # Draw a number badge instead of messy overlapping text
+            text_content = bounding_box.get("text_content", bounding_box.get("text", ""))
+            if text_content:
+                badge_text = str(i + 1)
+                
+                # Calculate dynamic padding and sizes
+                try:
+                    left, top, right, bottom = text_draw.textbbox((0, 0), badge_text, font=font)
