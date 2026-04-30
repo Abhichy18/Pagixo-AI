@@ -1,5 +1,9 @@
 # 📖 Advanced Math & Text OCR System
 
+> **"Something is cooking... the best and most accurate OCR detection system for students!"** 🍳🔥
+
+![App Screenshot](assets/screenshot.png)
+
 An enterprise-grade, highly precise Optical Character Recognition (OCR) application built with **Streamlit** and powered by **OpenRouter Vision Models** (Qwen 2.5, Nemotron, Baidu Qianfan).
 
 This application specializes in extracting complex mathematical equations, structured text, and technical diagrams from images and PDFs. It features a robust rendering pipeline that seamlessly translates raw OCR output into clean, beautifully formatted LaTeX.
