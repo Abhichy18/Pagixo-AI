@@ -205,3 +205,18 @@ def preprocess_latex(text: str) -> str:
         
     return text
 
+def render_latex_safely(text: str):
+    """Split and render LaTeX in chunks to avoid MathJax overflow"""
+    # Split by double newline to preserve multiline block equations
+    blocks = text.split('\n\n')
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        try:
+            st.markdown(block)
+        except:
+            # Fallback: show as code if rendering fails
+            st.code(block, language="latex")
+
+def parse_json(json_output):
