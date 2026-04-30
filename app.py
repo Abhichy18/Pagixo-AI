@@ -648,3 +648,141 @@ EXTRACTION RULES:
 8. Multi-term \\min \\max → include ALL comma-separated arguments
 9. Tables → put entire Markdown table in text_content
 10. Diagrams/state machines → put entire Mermaid.js code in text_content
+11. CRITICAL JSON REQUIREMENT: You MUST double-escape ALL LaTeX backslashes in your JSON strings. Output \\\\frac instead of \\frac, \\\\left instead of \\left, etc.
+
+SELF-VERIFY each bbox:
+□ Fraction orientation correct?
+□ All signs preserved?
+□ Bracket depth balanced?
+
+Output ONLY a valid JSON array. No markdown fences. No commentary."""
+
+                if subject_hint:
+                    prompt += f"\n\nAdditional context: {subject_hint}"
+                try:
+                    response = inference_with_api(temp_image_path, prompt, sys_prompt=sys_prompt, model_id=selected_model_id)
+                    # Create image with bounding boxes
+                    result_image = plot_text_bounding_boxes(temp_image_path, response)
+                    
+                    st.session_state["spot_response"] = response
+                    st.session_state["spot_image"] = result_image
+                except Exception as e:
+                    st.error(f"Error during inference: {str(e)}")
+                    
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.container(height=600):
+                if st.session_state["spot_image"] is not None:
+                    st.image(st.session_state["spot_image"], caption="Text Spotting Result", use_container_width=True)
+                else:
+                    st.image(image, caption="Uploaded Image", use_container_width=True)
+                    
+        with col2:
+            if subject_changed and st.session_state.get("spot_response"):
+                st.warning("⚠️ Subject changed — re-extract for best results.")
+            with st.container(height=600):
+                if st.session_state["spot_response"]:
+                    response = st.session_state["spot_response"]
+                    st.markdown("### Detected Text:")
+                    
+                    # Extract and render text beautifully
+                    try:
+                        clean_json = parse_json(response)
+                        # Fix unescaped backslashes
+                        fixed_json = re.sub(r'(?<!\\)\\(?![\\"/bfnrtu])', r'\\\\', clean_json)
+                        try:
+                            boxes = ast.literal_eval(fixed_json)
+                        except Exception:
+                            try:
+                                boxes = json.loads(fixed_json, strict=False)
+                            except Exception:
+                                boxes = []
+                                blocks = re.findall(r'\{[^{}]*\}', clean_json)
+                                for block in blocks:
+                                    bbox_match = re.search(r'"bbox_2d"\s*:\s*\[([^\]]+)\]', block)
+                                    text_match = re.search(r'"text(?:_content)?"\s*:\s*"([^"]+)"', block)
+                                    if bbox_match and text_match:
+                                        try:
+                                            coords = [int(float(x.strip())) for x in bbox_match.group(1).split(',')]
+                                            txt = text_match.group(1).replace('\\\\', '\\').replace('\\"', '"')
+                                            boxes.append({"bbox_2d": coords, "text_content": txt})
+                                        except Exception:
+                                            pass
+                                if not boxes:
+                                    raise Exception("Regex parser failed.")
+                            
+                        boxes = normalize_boxes(boxes)
+                        
+                        # Extract all text segments and ensure math is wrapped
+                        extracted_lines = []
+                        for idx, box in enumerate(boxes):
+                            txt = box.get("text_content", box.get("text", "")).strip()
+                            
+                            # Clean up backticks which cause Streamlit to render text in red inline code blocks
+                            txt = txt.replace('`', '')
+                            
+                            # Strip any messy existing $ or $$ delimiters from ends
+                            if txt.startswith('$$'): txt = txt[2:].strip()
+                            elif txt.startswith('$'): txt = txt[1:].strip()
+                            if txt.endswith('$$'): txt = txt[:-2].strip()
+                            elif txt.endswith('$'): txt = txt[:-1].strip()
+                            
+                            # Auto-correct common Free Model hallucinations (like \sqrt[3][x] instead of \sqrt[3]{x})
+                            txt = re.sub(r'\\sqrt\[([^\]]+)\]\[([^\]]+)\]', r'\\sqrt[\1]{\2}', txt)
+                            
+                            # Heuristic: if it contains heavy math, wrap it cleanly in $$
+                            math_keywords = ['\\frac', '\\min', '\\max', '\\left', '\\right', '\\cos', '\\sin', '\\log', '\\sum', '^', '_', '\\Big', '\\sqrt']
+                            if any(m in txt for m in math_keywords):
+                                txt = f"$${txt}$$"
+                            
+                            # Add Box Badge Prefix for UI linkage.
+                            # MUST use \n\n to ensure Streamlit parses the following $$ as a proper math block
+                            box_label = f"**🟢 Box {idx + 1}:**\n\n"
+                            extracted_lines.append(box_label + txt)
+                            
+                        full_text = " \n\n".join(extracted_lines)
+                        
+                        # Convert delimiters and fix array blocks for Streamlit
+                        formatted_text = preprocess_latex(full_text)
+                        
+                        tab1, tab2 = st.tabs(["📐 Rendered", "💻 Raw LaTeX"])
+                        with tab1:
+                            render_latex_safely(formatted_text)
+                            st.caption("⚠️ Complex equations may render better in the Raw LaTeX tab — copy and paste into Overleaf for full rendering.")
+                        with tab2:
+                            st.code(full_text, language="markdown")
+                            
+                        st.markdown("---")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            st.download_button("📄 Download .md", data=full_text, file_name="extracted.md", mime="text/markdown", key="md_spot")
+                        with col_b:
+                            tex_content = f"\\documentclass{{article}}\n\\usepackage{{amsmath}}\n\\begin{{document}}\n\n{full_text}\n\n\\end{{document}}"
+                            st.download_button("📐 Download .tex", data=tex_content, file_name="extracted.tex", mime="text/plain", key="tex_spot")
+                            
+                        response_escaped = full_text.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$').replace('\n', '\\n')
+                        html_code = f"""
+                        <button onclick="navigator.clipboard.writeText(`{response_escaped}`)" style="padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid #ccc; background-color: #212529; color: white; cursor: pointer; width: 100%;">
+                            📋 Copy to Clipboard
+                        </button>
+                        """
+                        components.html(html_code, height=50)
+                        
+                        st.markdown(" ")
+                        with st.expander("View Raw JSON Box Data"):
+                            st.code(clean_json, language="json")
+                    except Exception as e:
+                        # Fallback if JSON parsing fails
+                        st.code(response, language="json")
+else:
+    st.info("Please upload or capture an image to begin.")
+
+# Clean up temporary file
+if "session_id" in st.session_state:
+    temp_path = os.path.join(tempfile.gettempdir(), f"ocr_temp_{st.session_state['session_id']}.jpg")
+    if os.path.exists(temp_path):
+        try:
+            if image is None:
+                os.remove(temp_path)
+        except:
+            pass
