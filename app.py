@@ -179,3 +179,29 @@ if image is not None:
             st.sidebar.caption("Using original image.")
 
 # Helper functions
+def preprocess_latex(text: str) -> str:
+    text = text.strip()
+    
+    # 1. Strip markdown code fences (e.g. ```latex ... ```)
+    text = re.sub(r'^```[a-zA-Z]*\n', '', text)
+    text = re.sub(r'\n```$', '', text)
+    text = text.strip()
+    
+    # 2. Standard delimiter replacements
+    text = text.replace(r"\[", "$$").replace(r"\]", "$$")
+    text = text.replace(r"\(", "$").replace(r"\)", "$")
+    
+    # 3. Fix rogue array blocks that missed $$ wrappers
+    # Naively wrap all array blocks
+    text = text.replace(r"\begin{array}", "$$\n\\begin{array}")
+    text = text.replace(r"\end{array}", "\\end{array}\n$$")
+    
+    # Clean up duplicate $$ wrappers that this might have created
+    text = re.sub(r'\$\$\s*\$\$', '$$', text)
+    
+    # 4. If the model forgot math delimiters entirely but returned LaTeX
+    if ('\\frac' in text or '\\min' in text or '\\max' in text or '^' in text or '\\left' in text) and '$$' not in text and '$' not in text:
+        text = f"$$\n{text}\n$$"
+        
+    return text
+
