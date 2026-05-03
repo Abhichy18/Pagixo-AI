@@ -13,6 +13,7 @@ import io
 import fitz
 import re
 import tempfile
+import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 from enhance_image import enhance_image
@@ -49,23 +50,35 @@ st.sidebar.markdown("Powered by **OpenRouter Vision Models**")
 model_choice = st.sidebar.selectbox(
     "🧠 Select Model",
     [
+        "Auto (Smart Routing)",
+        "Nemotron OCR v1 (Nvidia API)",
+        "Qwen 2.5 VL 72B (Paid, Ultimate Math OCR)",
         "Nemotron Nano 12B VL (Free Vision Model)",
-        "Baidu Qianfan OCR Fast (Free OCR Model)",
-        "Qwen 2.5 VL 72B (Paid, Ultimate Math OCR)"
+        "Baidu Qianfan OCR Fast (Free OCR Model)"
     ]
 )
 
 model_map = {
     "Nemotron Nano 12B VL (Free Vision Model)": "nvidia/nemotron-nano-12b-v2-vl:free",
     "Baidu Qianfan OCR Fast (Free OCR Model)": "baidu/qianfan-ocr-fast:free",
-    "Qwen 2.5 VL 72B (Paid, Ultimate Math OCR)": "qwen/qwen-2.5-vl-72b-instruct"
+    "Qwen 2.5 VL 72B (Paid, Ultimate Math OCR)": "qwen/qwen-2.5-vl-72b-instruct",
+    "Nemotron OCR v1 (Nvidia API)": "nvidia/nemotron-ocr-v1"
 }
-selected_model_id = model_map[model_choice]
 
 subject = st.sidebar.selectbox(
     "📚 Subject / Context",
     ["Auto-detect", "Physics", "Calculus", "Linear Algebra", "Chemistry", "Statistics", "Computer Science", "Other"]
 )
+
+if model_choice == "Auto (Smart Routing)":
+    if subject in ["Auto-detect", "Other"]:
+        selected_model_id = "nvidia/nemotron-ocr-v1"
+        st.sidebar.caption("✨ **Auto-routed to:** Nvidia API (Best for General Text)")
+    else:
+        selected_model_id = "qwen/qwen-2.5-vl-72b-instruct"
+        st.sidebar.caption("✨ **Auto-routed to:** Qwen 2.5 (Best for Math & Science)")
+else:
+    selected_model_id = model_map[model_choice]
 
 subject_hints = {
     "Auto-detect": "First identify the subject area in one word, then extract all text and mathematical expressions precisely.",
@@ -250,11 +263,85 @@ def encode_image(image_path):
         return base64.b64encode(image_file.read()).decode("utf-8")
 
 def inference_with_api(image_path, prompt, sys_prompt="You are a precise document extraction assistant.", model_id="qwen/qwen-2.5-vl-72b-instruct"):
-    """Handles API communication with OpenRouter with unified error catching."""
-    if not os.getenv('OPENROUTER_API_KEY'):
-        raise ValueError("Please provide an OpenRouter API Key in your .env file or sidebar.")
-        
+    """Handles API communication with OpenRouter or Nvidia with unified error catching."""
     try:
+        if model_id == "nvidia/nemotron-ocr-v1":
+            if not os.getenv('NVIDIA_API_KEY'):
+                raise ValueError("Please provide an NVIDIA_API_KEY in your .env file.")
+                
+            invoke_url = "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v1"
+            headers = {
+                "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
+                "Accept": "application/json"
+            }
+            
+            # Ensure image size is within Nvidia's limits (<180k chars in base64)
+            img = Image.open(image_path)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            quality = 95
+            while True:
+                buffered = io.BytesIO()
+                img.save(buffered, format="JPEG", quality=quality)
+                base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                if len(base64_image) < 180000 or quality <= 10:
+                    break
+                quality -= 15
+                if quality < 30:
+                    img = img.resize((int(img.width * 0.8), int(img.height * 0.8)))
+            
+            payload = {
+              "input": [
+                {
+                  "type": "image_url",
+                  "url": f"data:image/jpeg;base64,{base64_image}"
+                }
+              ]
+            }
+            response = requests.post(invoke_url, headers=headers, json=payload)
+            if response.status_code != 200:
+                raise Exception(f"Nvidia API returned {response.status_code}: {response.text}")
+            
+            res_json = response.json()
+            
+            # If the app expects bounding boxes (Text Spotting mode)
+            if "bbox_2d" in prompt:
+                boxes = []
+                if "data" in res_json and isinstance(res_json["data"], list):
+                    for item in res_json["data"]:
+                        if "text_detections" in item and isinstance(item["text_detections"], list):
+                            for det in item["text_detections"]:
+                                txt = det.get("text_prediction", {}).get("text", "")
+                                pts = det.get("bounding_box", {}).get("points", [])
+                                if pts and len(pts) >= 4:
+                                    xs = [p.get("x", 0) for p in pts]
+                                    ys = [p.get("y", 0) for p in pts]
+                                    xmin, xmax = min(xs)*1000, max(xs)*1000
+                                    ymin, ymax = min(ys)*1000, max(ys)*1000
+                                    boxes.append({
+                                        "bbox_2d": [int(xmin), int(ymin), int(xmax), int(ymax)],
+                                        "text_content": txt
+                                    })
+                return json.dumps(boxes)
+            else:
+                # Full Page OCR mode
+                extracted_texts = []
+                if "data" in res_json and isinstance(res_json["data"], list):
+                    for item in res_json["data"]:
+                        if "text_detections" in item and isinstance(item["text_detections"], list):
+                            for detection in item["text_detections"]:
+                                if "text_prediction" in detection and "text" in detection["text_prediction"]:
+                                    extracted_texts.append(detection["text_prediction"]["text"])
+                if extracted_texts:
+                    return "\n".join(extracted_texts)
+            
+            # Fallback
+            return json.dumps(res_json)
+        
+        # OpenRouter fallback
+        if not os.getenv('OPENROUTER_API_KEY'):
+            raise ValueError("Please provide an OpenRouter API Key in your .env file or sidebar.")
+            
         base64_image = encode_image(image_path)
         client = OpenAI(
             api_key=os.getenv('OPENROUTER_API_KEY'),
