@@ -1,0 +1,179 @@
+/* Pagixo OCR Extension — Global Styles */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base Reset ───────────────────────────────────────────── */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: #0F0D2E;
+    color: #E0E7FF;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgba(30, 27, 75, 0.5);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.4);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+  }
+}
+
+/* ─── Component Utilities ──────────────────────────────────── */
+@layer components {
+  /* Glassmorphism card */
+  .glass-card {
+    @apply rounded-xl border border-white/10;
+    background: rgba(26, 23, 68, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  /* Primary gradient button */
+  .btn-primary {
+    @apply px-4 py-2.5 rounded-lg font-semibold text-white
+           transition-all duration-200 ease-out
+           hover:shadow-glow active:scale-[0.97];
+    background: linear-gradient(135deg, #4F46E5, #6366F1);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #4338CA, #4F46E5);
+  }
+
+  /* Accent gradient button */
+  .btn-accent {
+    @apply px-4 py-2.5 rounded-lg font-semibold text-white
+           transition-all duration-200 ease-out
+           hover:shadow-glow-accent active:scale-[0.97];
+    background: linear-gradient(135deg, #10B981, #34D399);
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply px-3 py-2 rounded-lg font-medium
+           text-pagixo-text-muted bg-transparent
+           border border-white/10
+           transition-all duration-200
+           hover:bg-white/5 hover:text-white hover:border-white/20
+           active:scale-[0.97];
+  }
+
+  /* Status dot */
+  .status-dot {
+    @apply w-2.5 h-2.5 rounded-full inline-block;
+  }
+  .status-dot.online {
+    @apply bg-pagixo-accent;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  }
+  .status-dot.offline {
+    @apply bg-pagixo-error;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+  }
+  .status-dot.checking {
+    @apply bg-pagixo-warning animate-pulse;
+  }
+
+  /* Tab button */
+  .tab-btn {
+    @apply px-4 py-2 text-sm font-medium rounded-lg
+           text-pagixo-text-muted transition-all duration-200
+           hover:text-white hover:bg-white/5;
+  }
+  .tab-btn.active {
+    @apply text-white bg-pagixo-primary/20 border border-pagixo-primary/30;
+  }
+
+  /* Input field */
+  .input-field {
+    @apply w-full px-3 py-2.5 rounded-lg
+           bg-pagixo-bg border border-white/10
+           text-pagixo-text placeholder:text-pagixo-text-muted/50
+           focus:outline-none focus:border-pagixo-primary/50 focus:ring-1 focus:ring-pagixo-primary/30
+           transition-all duration-200;
+  }
+
+  /* Scan animation overlay */
+  .scan-overlay {
+    position: relative;
+    overflow: hidden;
+  }
+  .scan-overlay::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #4F46E5, transparent);
+    animation: scanLine 1.5s ease-in-out infinite;
+  }
+}
+
+/* ─── Utility Animations ───────────────────────────────────── */
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(135deg, #6366F1, #10B981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .border-gradient {
+    border-image: linear-gradient(135deg, #4F46E5, #10B981) 1;
+  }
+}
+
+/* ─── Keyframe Animations ──────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes scanLine {
+  0%, 100% { transform: translateY(0); opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade {
+  animation: fade 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.25s ease-out;
+}
