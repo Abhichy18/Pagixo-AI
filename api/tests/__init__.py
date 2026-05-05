@@ -1,0 +1,1 @@
+# Pagixo API tests package
