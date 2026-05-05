@@ -1,0 +1,64 @@
+# ─────────────────────────────────────────────────────────────
+# Pagixo OCR — Docker Compose (Streamlit + FastAPI Bridge)
+# ─────────────────────────────────────────────────────────────
+# Usage:
+#   docker-compose up          → start both services
+#   docker-compose up -d       → start in background
+#   docker-compose down        → stop all
+#   docker-compose logs -f api → tail API logs
+# ─────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+  # ─── Streamlit OCR App (Main) ─────────────────────
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: pagixo-streamlit
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    networks:
+      - pagixo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── FastAPI OCR Bridge (Chrome Extension API) ────
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: pagixo-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app/api
+      - ./enhance_image.py:/app/enhance_image.py:ro
+      - ./.env:/app/.env:ro
+    env_file:
+      - .env
+    depends_on:
+      streamlit:
+        condition: service_started
+    networks:
+      - pagixo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  pagixo-net:
+    driver: bridge
+    name: pagixo-net
