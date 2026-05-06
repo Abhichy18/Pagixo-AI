@@ -37,6 +37,7 @@ export const ENDPOINTS = {
   HEALTH: '/health',
   OCR: '/api/ocr',
   HISTORY: '/api/history',
+  CHAT: '/api/chat',
 };
 
 // Extension branding
