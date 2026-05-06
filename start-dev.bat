@@ -20,13 +20,13 @@ if not exist ".env" (
 )
 
 echo   Starting Streamlit on port 8501...
-start "Pagixo Streamlit" cmd /k "cd /d %~dp0 && streamlit run app.py --server.port 8501 --server.headless true"
+start "Pagixo Streamlit" cmd /k "cd /d %~dp0 && python -m streamlit run app.py --server.port 8501 --server.headless true"
 
 REM Brief pause
 timeout /t 2 /nobreak >nul
 
 echo   Starting FastAPI on port 8000...
-start "Pagixo API" cmd /k "cd /d %~dp0 && uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir api/"
+start "Pagixo API" cmd /k "cd /d %~dp0 && python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir api/"
 
 echo.
 echo   ┌─────────────────────────────────────────┐
