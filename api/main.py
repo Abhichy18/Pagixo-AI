@@ -102,7 +102,9 @@ setup_cors(app)
 
 # Include OCR router
 from api.routers.ocr import router as ocr_router
+from api.routers.chat import router as chat_router
 app.include_router(ocr_router)
+app.include_router(chat_router)
 
 
 # ─── Health Endpoint ──────────────────────────────────────────────────────────
