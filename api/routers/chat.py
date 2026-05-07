@@ -11,7 +11,7 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
     """
     Text-based chat endpoint.
     Accepts question + OCR context + history.
-    Routes to NVIDIA NIM DeepSeek-R1 (text model).
+    Routes to the configured NVIDIA NIM text model.
     """
     return await call_text_chat(req)
 

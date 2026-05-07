@@ -1,5 +1,6 @@
 // ChatMessage.jsx
 import React, { useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import renderMathInElement from 'katex/contrib/auto-render';
 import 'katex/dist/katex.min.css';
 
@@ -25,7 +26,11 @@ export function ChatMessage({ role, content, isLoading }) {
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\n/g, '<br/>');
-    return <span ref={contentRef} dangerouslySetInnerHTML={{ __html: parts }} />;
+    const safeHtml = DOMPurify.sanitize(parts, {
+      ALLOWED_TAGS: ['strong', 'code', 'br', 'span'],
+      ALLOWED_ATTR: ['class'],
+    });
+    return <span ref={contentRef} dangerouslySetInnerHTML={{ __html: safeHtml }} />;
   }
 
   useEffect(() => {

@@ -1,11 +1,9 @@
 # api/services/nvidia_nim.py
 import os
-import base64
 from typing import Optional
+
 from openai import AsyncOpenAI
-from api.models.chat_models import ChatRequest, ChatResponse, ChatMessage
-from pydantic import BaseModel, Field
-from typing import List
+from api.models.chat_models import ChatRequest, ChatResponse
 
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 TEXT_MODEL = "meta/llama-3.1-8b-instruct"
