@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from typing import List
 
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
-TEXT_MODEL = "deepseek-ai/deepseek-r1"
+TEXT_MODEL = "meta/llama-3.1-8b-instruct"
 VISION_MODEL = "meta/llama-3.2-11b-vision-instruct"
 
 
