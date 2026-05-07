@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { AIChatPanel } from './AIChatPanel';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import katex from 'katex';
@@ -240,6 +241,9 @@ export default function ResultViewer({ result }) {
 
       {/* Scan Another — Action Panel */}
       <ScanActionPanel />
+
+      {/* ── Pagixo AI Chat ── */}
+      <AIChatPanel text={text} />
     </div>
   );
 }
