@@ -1,8 +1,11 @@
 streamlit
 pillow
-openai
+openai>=1.0.0
 python-dotenv
 opencv-python
 numpy
 PyMuPDF
 requests
+fastapi
+pydantic
+uvicorn

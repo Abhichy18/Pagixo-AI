@@ -14,6 +14,10 @@ import {
   HEALTH_CHECK_INTERVAL_MS,
 } from '../shared/constants.js';
 
+// ─── Chat Endpoints ──────────────────────────────────────────
+const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`;
+const CHAT_VISION_ENDPOINT = `${API_BASE_URL}/api/chat-vision`;
+
 // ─── State ───────────────────────────────────────────────────
 let lastScanTime = null;
 let healthCheckTimer = null;
@@ -183,6 +187,9 @@ async function handleMessage(message, sender) {
     case 'openSidePanel':
       return await openSidePanel(sender.tab?.windowId);
 
+    case 'askAI':
+      return await handleAskAI(message);
+
     default:
       console.warn('[Pagixo] Unknown message action:', message.action);
       return { error: 'Unknown action' };
@@ -207,7 +214,11 @@ async function handleProcessFile(message, sender) {
     const filename = name || 'dropped-file.png';
 
     const tab = sender.tab || null;
-    return await sendToOCRApi(blob, filename, tab);
+    const ocrResult = await sendToOCRApi(blob, filename, tab);
+    if (ocrResult.success) {
+      await saveContextAfterScan(ocrResult.result, tab, 'upload');
+    }
+    return ocrResult;
   } catch (err) {
     console.error('[Pagixo] processFile error:', err);
     setBadge('!', '#EF4444');
@@ -225,7 +236,11 @@ async function handleCaptureArea(message, sender) {
   console.log('[Pagixo] Capturing area:', rect);
   setBadge('...', '#F59E0B');
 
-  return await captureAndSend(tab, rect);
+  const captureResult = await captureAndSend(tab, rect);
+  if (captureResult.success) {
+    await saveContextAfterScan(captureResult.result, tab, 'capture');
+  }
+  return captureResult;
 }
 
 async function handleGetStatus() {
@@ -253,14 +268,22 @@ async function handleCaptureVisiblePage(message) {
     const tab = tabs[0];
     console.log('[Pagixo] Capturing visible page (auto-detected tab):', tab.id);
     setBadge('...', '#F59E0B');
-    return await captureAndSend(tab, null);
+    const visResult1 = await captureAndSend(tab, null);
+    if (visResult1.success) {
+      await saveContextAfterScan(visResult1.result, tab, 'visible_page');
+    }
+    return visResult1;
   }
 
   try {
     const tab = await chrome.tabs.get(tabId);
     console.log('[Pagixo] Capturing visible page:', tab.url?.substring(0, 60));
     setBadge('...', '#F59E0B');
-    return await captureAndSend(tab, null);
+    const visResult2 = await captureAndSend(tab, null);
+    if (visResult2.success) {
+      await saveContextAfterScan(visResult2.result, tab, 'visible_page');
+    }
+    return visResult2;
   } catch (err) {
     console.error('[Pagixo] captureVisiblePage failed:', err);
     setBadge('!', '#EF4444');
@@ -588,6 +611,53 @@ async function ensureContentScript(tabId) {
     // Small delay to let script initialize
     await sleep(200);
   }
+}
+
+// ─── 9. AI CHAT HANDLER ──────────────────────────────────────
+async function handleAskAI({ question, context, history, imageBase64, pageUrl, scanType }) {
+  const hasImage = !!imageBase64;
+  const endpoint = hasImage ? CHAT_VISION_ENDPOINT : CHAT_ENDPOINT;
+
+  const body = {
+    question,
+    context: context || '',
+    history: history || [],
+    page_url: pageUrl || '',
+    scan_type: scanType || 'unknown',
+  };
+
+  if (hasImage) {
+    body.image_base64 = imageBase64;
+    body.image_media_type = 'image/png';
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`API returned ${response.status}: ${errText}`);
+  }
+
+  return await response.json();
+}
+
+// ─── 10. CONTEXT SAVING AFTER SCAN ───────────────────────────
+async function saveContextAfterScan(result, tab, scanType) {
+  const context = {
+    extractedText: result.text || '',
+    screenshotBase64: result.imageBase64 || result.screenshotBase64 || null,
+    pageUrl: tab?.url || '',
+    pageTitle: tab?.title || '',
+    scanType, // 'visible_page' | 'capture' | 'upload'
+    timestamp: Date.now(),
+  };
+  await chrome.storage.session.set({ pagixoContext: context });
+  // Clear stale chat history when new scan completes
+  await chrome.storage.session.remove('pagixoChatHistory');
 }
 
 // ─── STARTUP LOG ─────────────────────────────────────────────
