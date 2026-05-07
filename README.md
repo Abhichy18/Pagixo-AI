@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="Pagixo AI Banner" width="700"/>
+</p>
+
 <h1 align="center">📖 Pagixo AI - Advanced Math & Text OCR</h1>
 
 <p align="center">
