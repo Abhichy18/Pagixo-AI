@@ -1,5 +1,7 @@
 // ChatMessage.jsx
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import renderMathInElement from 'katex/contrib/auto-render';
+import 'katex/dist/katex.min.css';
 
 /**
  * Renders a single chat message bubble.
@@ -11,6 +13,7 @@ import React from 'react';
  */
 export function ChatMessage({ role, content, isLoading }) {
   const isUser = role === 'user';
+  const contentRef = useRef(null);
 
   /**
    * Lightweight markdown renderer — no external dependencies.
@@ -22,8 +25,22 @@ export function ChatMessage({ role, content, isLoading }) {
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\n/g, '<br/>');
-    return <span dangerouslySetInnerHTML={{ __html: parts }} />;
+    return <span ref={contentRef} dangerouslySetInnerHTML={{ __html: parts }} />;
   }
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    renderMathInElement(contentRef.current, {
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '$', right: '$', display: false },
+        { left: '\\[', right: '\\]', display: true },
+        { left: '\\(', right: '\\)', display: false },
+      ],
+      throwOnError: false,
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+    });
+  }, [content]);
 
   // Show animated typing indicator while AI is responding
   if (isLoading) {

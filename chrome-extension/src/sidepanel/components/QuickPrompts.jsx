@@ -25,7 +25,7 @@ export function QuickPrompts({ onSelect, disabled }) {
         <button
           key={label}
           className="px-quick-prompt-chip"
-          onClick={() => onSelect(prompt)}
+          onClick={() => onSelect(prompt, { label })}
           disabled={disabled}
           title={prompt}
           type="button"

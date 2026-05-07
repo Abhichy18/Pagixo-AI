@@ -80,7 +80,7 @@ export function AIChatPanel({ text }) {
   }, [messages, isLoading]);
 
   // ── Send a message ────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (questionOverride) => {
+  const sendMessage = useCallback(async (questionOverride, meta) => {
     const rawQuestion = (questionOverride || input).trim();
     if (!rawQuestion || isLoading) return;
 
@@ -90,9 +90,17 @@ export function AIChatPanel({ text }) {
     // Smart intent detection: augment form-fill queries with extra context hint
     const FORM_KEYWORDS = ['fill', 'form', 'input', 'field', 'complete', 'submit'];
     const isFormQuery = FORM_KEYWORDS.some(k => rawQuestion.toLowerCase().includes(k));
-    const question = (isFormQuery && context?.scanType === 'visible_page')
+    let question = (isFormQuery && context?.scanType === 'visible_page')
       ? `${rawQuestion}\n\n[Context: This appears to be a form page. Please list each form field with a clear instruction on what to enter.]`
       : rawQuestion;
+
+    // Apply clean, student-friendly math formatting only for Solve prompt
+    if (meta?.label === 'Solve') {
+      question += (
+        "\n\n[Formatting: Provide a clean, step-by-step solution. Use aligned equations and avoid narrative filler. " +
+        "Prefer a short plan, then computations, then a boxed final answer in LaTeX. Use $$...$$ for block math.]"
+      );
+    }
 
     const userMsg = { role: 'user', content: rawQuestion }; // show raw in UI
     const updatedMsgs = [...messages, userMsg];
@@ -203,7 +211,7 @@ export function AIChatPanel({ text }) {
 
           {/* Quick prompt chips */}
           <QuickPrompts
-            onSelect={(prompt) => sendMessage(prompt)}
+            onSelect={(prompt, meta) => sendMessage(prompt, meta)}
             disabled={isLoading}
           />
 
