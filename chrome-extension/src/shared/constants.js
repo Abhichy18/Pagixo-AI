@@ -1,17 +1,13 @@
-/**
- * Shared constants for the Pagixo OCR Chrome Extension.
- * Used by popup, sidepanel, background, and content scripts.
- */
+/** Shared constants for the extension. */
 
-// API base URL — configured via environment variable or fallback
-// Note: esbuild replaces import.meta.env.VITE_API_BASE_URL at build time
+// API base URL. Vite replaces VITE_API_BASE_URL at build time.
 export const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
-// File size limits
+// File size limits.
 export const MAX_FILE_SIZE_MB = 20;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-// Supported file types for OCR
+// Supported file types for OCR.
 export const SUPPORTED_TYPES = [
   'image/png',
   'image/jpeg',
@@ -19,10 +15,10 @@ export const SUPPORTED_TYPES = [
   'application/pdf',
 ];
 
-// Supported file extensions (for quick validation)
+// Supported file extensions.
 export const SUPPORTED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'pdf'];
 
-// Chrome storage keys — namespaced to avoid conflicts
+// Chrome storage keys.
 export const STORAGE_KEYS = {
   HISTORY: 'pagixo_history',
   SETTINGS: 'pagixo_settings',
@@ -32,7 +28,7 @@ export const STORAGE_KEYS = {
   SCAN_IN_PROGRESS: 'pagixo_scan_progress',
 };
 
-// API endpoints
+// API endpoints.
 export const ENDPOINTS = {
   HEALTH: '/health',
   OCR: '/api/ocr',
@@ -40,7 +36,7 @@ export const ENDPOINTS = {
   CHAT: '/api/chat',
 };
 
-// Extension branding
+// Extension branding.
 export const BRAND = {
   NAME: 'Pagixo OCR',
   TAGLINE: 'Scan any image or PDF instantly',
@@ -55,11 +51,11 @@ export const BRAND = {
   },
 };
 
-// Retry configuration for API calls
+// Retry configuration for API calls.
 export const RETRY_CONFIG = {
   MAX_RETRIES: 3,
   BACKOFF_MS: [500, 1000, 2000],
 };
 
-// Health check interval (ms)
+// Health check interval (ms).
 export const HEALTH_CHECK_INTERVAL_MS = 60_000;

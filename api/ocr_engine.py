@@ -1,14 +1,4 @@
-"""
-OCR Engine Adapter for the FastAPI Bridge.
-
-This module wraps the existing OCR inference logic from the root app.py 
-WITHOUT modifying it. It extracts and re-exposes the core functions 
-(inference_with_api, enhance_image, encode_image) so the FastAPI router
-can call them cleanly.
-
-IMPORTANT: This does NOT import app.py directly (it would trigger Streamlit).
-Instead, it reimplements the core OCR pipeline using the same API calls and logic.
-"""
+"""OCR engine adapter for the FastAPI bridge."""
 
 import os
 import io
@@ -25,20 +15,19 @@ from PIL import Image
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Ensure the project root is on sys.path so we can import enhance_image
+# Allow importing enhance_image from the project root.
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, PROJECT_ROOT)
 
 from enhance_image import enhance_image  # noqa: E402
 
-# Load environment variables from the root .env file
+# Load environment variables from the root .env file.
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"), override=True)
 
 logger = logging.getLogger("pagixo.ocr_engine")
 
 
-# ─── Model Configuration ─────────────────────────────────────────────────────
-
+# Model configuration.
 MODEL_MAP = {
     "baidu-ocr":      "baidu/qianfan-ocr-fast:free",
     "nemotron-nano":  "nvidia/nemotron-nano-12b-v2-vl:free",
@@ -46,9 +35,7 @@ MODEL_MAP = {
     "nemotron-ocr":  "nvidia/nemotron-ocr-v1",
 }
 
-# Primary: Baidu Qianfan OCR Fast (free, OpenRouter)
-# Fallback 1: Nemotron Nano (free, OpenRouter)
-# Fallback 2: NVIDIA Nemotron OCR v1 (NVIDIA direct API)
+# Primary then fallback chain.
 DEFAULT_MODEL_ID = "baidu/qianfan-ocr-fast:free"
 FALLBACK_CHAIN = [
     "baidu/qianfan-ocr-fast:free",
@@ -56,7 +43,7 @@ FALLBACK_CHAIN = [
     "nvidia/nemotron-ocr-v1",
 ]
 
-# System prompts for different modes
+# Prompts for different modes.
 GENERAL_SYS_PROMPT = (
     "You are a highly precise, versatile OCR engine. "
     "Your purpose is pixel-perfect transcription of any image content."
@@ -113,8 +100,7 @@ EXTRACTION PROTOCOL:
 Output ONLY the extracted content — no explanations, no commentary."""
 
 
-# ─── Core Functions ───────────────────────────────────────────────────────────
-
+# Core functions.
 def encode_image(image_path: str) -> str:
     """Read an image file and return its base64-encoded string."""
     with open(image_path, "rb") as f:
@@ -122,10 +108,7 @@ def encode_image(image_path: str) -> str:
 
 
 def _call_nvidia_ocr(image_path: str) -> str:
-    """
-    Call the NVIDIA Nemotron OCR v1 API directly.
-    Mirrors the logic from app.py lines 268-339.
-    """
+    """Call the NVIDIA Nemotron OCR v1 API directly."""
     api_key = os.getenv("NVIDIA_API_KEY")
     if not api_key:
         raise ValueError("NVIDIA_API_KEY not found in environment variables.")
@@ -136,7 +119,7 @@ def _call_nvidia_ocr(image_path: str) -> str:
         "Accept": "application/json",
     }
 
-    # Resize/compress image to stay within NVIDIA's base64 limit (~180k chars)
+    # Resize/compress to stay within NVIDIA's base64 limit (~180k chars).
     img = Image.open(image_path)
     if img.mode != "RGB":
         img = img.convert("RGB")
@@ -167,7 +150,7 @@ def _call_nvidia_ocr(image_path: str) -> str:
 
     res_json = response.json()
 
-    # Extract text from NVIDIA's response structure
+    # Extract text from NVIDIA's response structure.
     extracted_texts = []
     if "data" in res_json and isinstance(res_json["data"], list):
         for item in res_json["data"]:
@@ -179,15 +162,12 @@ def _call_nvidia_ocr(image_path: str) -> str:
     if extracted_texts:
         return "\n".join(extracted_texts)
 
-    # Fallback: return raw JSON
+    # Fallback: return raw JSON.
     return json.dumps(res_json)
 
 
 def _call_openrouter_ocr(image_path: str, prompt: str, sys_prompt: str, model_id: str) -> str:
-    """
-    Call the OpenRouter API for OCR.
-    Mirrors the logic from app.py lines 341-381.
-    """
+    """Call the OpenRouter API for OCR."""
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise ValueError("OPENROUTER_API_KEY not found in environment variables.")
@@ -240,20 +220,8 @@ def run_ocr(
     subject: str = "Auto-detect",
     do_enhance: bool = True,
 ) -> Tuple[str, str]:
-    """
-    Main OCR pipeline entry point for the FastAPI bridge.
-
-    Args:
-        image_path: Absolute path to the image/page file.
-        model_id: Model identifier (key from MODEL_MAP or full model string).
-                  Defaults to baidu/qianfan-ocr-fast:free.
-        subject: Subject context for prompt selection.
-        do_enhance: Whether to run image enhancement before OCR.
-
-    Returns:
-        Tuple of (extracted_text, model_id_used)
-    """
-    # Resolve model ID
+    """Main OCR pipeline entry point for the FastAPI bridge."""
+    # Resolve model ID.
     if model_id and model_id in MODEL_MAP:
         resolved_model = MODEL_MAP[model_id]
     elif model_id:

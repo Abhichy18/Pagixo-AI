@@ -4,22 +4,12 @@ import DOMPurify from 'dompurify';
 import renderMathInElement from 'katex/contrib/auto-render';
 import 'katex/dist/katex.min.css';
 
-/**
- * Renders a single chat message bubble.
- * 
- * Props:
- *   role      {string}  — 'user' | 'assistant'
- *   content   {string}  — message text (supports **bold**, `code`, newlines)
- *   isLoading {boolean} — if true, shows animated typing indicator instead of content
- */
+/** Renders a single chat message bubble. */
 export function ChatMessage({ role, content, isLoading }) {
   const isUser = role === 'user';
   const contentRef = useRef(null);
 
-  /**
-   * Lightweight markdown renderer — no external dependencies.
-   * Converts: **bold**, `code`, and \n → <br/>
-   */
+  /** Lightweight markdown renderer for bold/code/newlines. */
   function renderContent(text) {
     if (!text) return null;
     const parts = text
@@ -47,7 +37,7 @@ export function ChatMessage({ role, content, isLoading }) {
     });
   }, [content]);
 
-  // Show animated typing indicator while AI is responding
+  // Show a typing indicator while AI is responding.
   if (isLoading) {
     return (
       <div className="px-message px-message--ai">

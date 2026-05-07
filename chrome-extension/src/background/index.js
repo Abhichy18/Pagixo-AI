@@ -1,8 +1,6 @@
 /**
- * Pagixo OCR — Background Service Worker (The Brain)
- * 
- * Handles: context menus, message routing, API calls,
- * health checks, and side panel management.
+ * Background service worker.
+ * Handles context menus, routing, and API calls.
  */
 
 import {
@@ -14,19 +12,19 @@ import {
   HEALTH_CHECK_INTERVAL_MS,
 } from '../shared/constants.js';
 
-// ─── Chat Endpoints ──────────────────────────────────────────
+// Chat endpoints.
 const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`;
 const CHAT_VISION_ENDPOINT = `${API_BASE_URL}/api/chat-vision`;
 
-// ─── State ───────────────────────────────────────────────────
+// State.
 let lastScanTime = null;
 let healthCheckTimer = null;
 
-// ─── 1. CONTEXT MENUS — Setup on Install ─────────────────────
+// Context menus.
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[Pagixo] Extension installed — setting up context menus');
 
-  // Remove old menus first (handles updates cleanly)
+  // Remove old menus first (handles updates cleanly).
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: 'scanImage',
@@ -47,7 +45,7 @@ chrome.runtime.onInstalled.addListener(() => {
     });
   });
 
-  // Mark first run for onboarding
+  // Mark first run for onboarding.
   chrome.storage.local.get(STORAGE_KEYS.IS_FIRST_RUN, (data) => {
     if (data[STORAGE_KEYS.IS_FIRST_RUN] === undefined) {
       chrome.storage.local.set({ [STORAGE_KEYS.IS_FIRST_RUN]: true });
@@ -55,27 +53,24 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-// Enable side panel to open on extension icon click (fallback)
+// Enable side panel to open on extension icon click (fallback).
 try {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
     .catch(() => {});
 } catch (e) {
-  // Older Chrome versions may not support this
+  // Older Chrome versions may not support this.
 }
 
-// ─── 2. CONTEXT MENU HANDLER ─────────────────────────────────
+// Context menu handler.
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  // CRITICAL: Open side panel SYNCHRONOUSLY as the very first call.
-  // chrome.sidePanel.open() requires a user gesture context.
-  // ANY await/async before this call will kill the gesture and the
-  // panel will NOT open. This must be the first statement.
+  // Open side panel synchronously to preserve the user gesture.
   if (tab) {
     chrome.sidePanel.open({ windowId: tab.windowId }).catch((err) => {
       console.warn('[Pagixo] Could not open side panel:', err);
     });
   }
 
-  // Now handle the actual scan (async work is fine after the open call)
+  // Handle the scan after opening the panel.
   (async () => {
     try {
       switch (info.menuItemId) {
@@ -158,16 +153,16 @@ async function handleScanPage(tab) {
   }
 }
 
-// ─── 3. MESSAGE HANDLER ──────────────────────────────────────
+// Message handler.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Must return true for async response
+  // Must return true for async response.
   handleMessage(message, sender)
     .then((result) => sendResponse(result))
     .catch((err) => {
       console.error('[Pagixo] Message handler error:', err);
       sendResponse({ error: err.message });
     });
-  return true; // Keep channel open for async
+  return true; // Keep channel open for async.
 });
 
 async function handleMessage(message, sender) {
@@ -204,7 +199,7 @@ async function handleProcessFile(message, sender) {
   setBadge('...', '#F59E0B');
 
   try {
-    // Convert base64 to blob
+    // Convert base64 to blob.
     const binaryStr = atob(data);
     const bytes = new Uint8Array(binaryStr.length);
     for (let i = 0; i < binaryStr.length; i++) {
@@ -292,7 +287,7 @@ async function handleCaptureVisiblePage(message) {
   }
 }
 
-// ─── 4. API CALL — sendToOCRApi ──────────────────────────────
+// API call: sendToOCRApi.
 async function sendToOCRApi(blob, filename, tab) {
   const formData = new FormData();
   formData.append('file', blob, filename);

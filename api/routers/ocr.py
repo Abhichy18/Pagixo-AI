@@ -1,19 +1,4 @@
-"""
-OCR Router — Handles file upload, OCR processing, and history.
-
-Security hardened:
-  - File size validation (413 for > 20MB)
-  - MIME type validation via magic bytes
-  - Rate limiting: 30 requests/min per IP
-  - X-Request-ID header on all responses
-  - /api/origins endpoint for extension self-configuration
-
-Endpoints:
-  POST   /api/ocr      — Upload an image/PDF for OCR processing
-  GET    /api/history   — Retrieve the last 50 scan results
-  DELETE /api/history   — Clear all scan history
-  GET    /api/origins   — List allowed CORS origins
-"""
+"""OCR router: upload, history, and origins."""
 
 import os
 import io
@@ -37,18 +22,18 @@ logger = logging.getLogger("pagixo.router.ocr")
 
 router = APIRouter(prefix="/api", tags=["OCR"])
 
-# ─── Thread-safe in-memory history ───────────────────────────────────────────
+# Thread-safe in-memory history.
 MAX_HISTORY = 50
 _history: deque[HistoryItem] = deque(maxlen=MAX_HISTORY)
 _history_lock = threading.Lock()
 
-# ─── Rate Limiting (in-memory, per IP) ───────────────────────────────────────
+# Rate limiting (in-memory, per IP).
 RATE_LIMIT_MAX = 30           # max requests
 RATE_LIMIT_WINDOW_S = 60      # per minute
 _rate_tracker: dict = {}       # { ip: [timestamps] }
 _rate_lock = threading.Lock()
 
-# Allowed MIME types and extensions
+# Allowed MIME types and extensions.
 ALLOWED_MIME_TYPES = {
     "image/png",
     "image/jpeg",
@@ -59,7 +44,7 @@ ALLOWED_MIME_TYPES = {
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
 
-# Magic bytes for file type validation
+# Magic bytes for file type validation.
 MAGIC_SIGNATURES = {
     b"\x89PNG\r\n\x1a\n": "image/png",
     b"\xff\xd8\xff": "image/jpeg",
@@ -71,7 +56,7 @@ MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 
 
 def _check_rate_limit(client_ip: str) -> None:
-    """Enforce rate limiting: max 30 requests per minute per IP."""
+    """Enforce rate limiting per IP."""
     now = time.time()
     cutoff = now - RATE_LIMIT_WINDOW_S
 
@@ -79,7 +64,7 @@ def _check_rate_limit(client_ip: str) -> None:
         if client_ip not in _rate_tracker:
             _rate_tracker[client_ip] = []
 
-        # Prune old timestamps
+        # Prune old timestamps.
         _rate_tracker[client_ip] = [
             t for t in _rate_tracker[client_ip] if t > cutoff
         ]
@@ -95,7 +80,7 @@ def _check_rate_limit(client_ip: str) -> None:
 
 
 def _detect_mime_by_magic(file_bytes: bytes) -> Optional[str]:
-    """Detect MIME type from magic bytes (first 8 bytes)."""
+    """Detect MIME type from magic bytes."""
     header = file_bytes[:8]
     for sig, mime in MAGIC_SIGNATURES.items():
         if header.startswith(sig):
@@ -108,11 +93,7 @@ def _detect_mime_by_magic(file_bytes: bytes) -> Optional[str]:
 
 
 def _validate_file(file: UploadFile) -> str:
-    """
-    Validate uploaded file type by extension and content type.
-    Returns the lowercase file extension.
-    Raises HTTPException(422) for invalid files.
-    """
+    """Validate uploaded file type by extension and content type."""
     if not file.filename:
         raise HTTPException(status_code=422, detail="Filename is required.")
 
@@ -123,7 +104,7 @@ def _validate_file(file: UploadFile) -> str:
             detail=f"Unsupported file type '.{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
 
-    # Also check content_type if provided
+    # Also check content_type if provided.
     if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
         logger.warning(
             f"[Pagixo] MIME type '{file.content_type}' not in allowlist, "
@@ -134,16 +115,13 @@ def _validate_file(file: UploadFile) -> str:
 
 
 def _validate_file_bytes(file_bytes: bytes, ext: str, filename: str) -> None:
-    """
-    Secondary validation: check magic bytes match the claimed extension.
-    Raises HTTPException(422) on mismatch.
-    """
+    """Validate magic bytes against the claimed extension."""
     detected_mime = _detect_mime_by_magic(file_bytes)
     if detected_mime is None:
         logger.warning(f"[Pagixo] Could not detect MIME from magic bytes for '{filename}'")
         return  # Allow — some edge cases might not have standard headers
 
-    # Map extension to expected MIME
+    # Map extension to expected MIME.
     ext_to_mime = {
         "png": "image/png",
         "jpg": "image/jpeg",
@@ -166,7 +144,7 @@ def _validate_file_bytes(file_bytes: bytes, ext: str, filename: str) -> None:
 
 
 def _add_request_id(response: Response) -> str:
-    """Generate and attach a request ID to the response."""
+    """Generate and attach a request ID."""
     request_id = uuid.uuid4().hex[:12]
     response.headers["X-Request-ID"] = request_id
     return request_id
@@ -193,28 +171,22 @@ async def process_ocr(
     subject: str = Query(default="Auto-detect", description="Subject context"),
     enhance: bool = Query(default=True, description="Whether to auto-enhance"),
 ):
-    """
-    Process an uploaded image or PDF through the OCR pipeline.
-    
-    Supported formats: PNG, JPEG, WebP, PDF
-    Max file size: 20MB
-    Rate limit: 30 requests/minute per IP
-    """
-    # Request ID
+    """Process an uploaded image or PDF through the OCR pipeline."""
+    # Request ID.
     req_id = _add_request_id(response)
 
-    # Rate limiting
+    # Rate limiting.
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
 
-    # Validate file extension
+    # Validate file extension.
     ext = _validate_file(file)
 
     start_time = time.time()
     temp_path = None
 
     try:
-        # Read file contents
+        # Read file contents.
         file_bytes = await file.read()
         file_size = len(file_bytes)
 

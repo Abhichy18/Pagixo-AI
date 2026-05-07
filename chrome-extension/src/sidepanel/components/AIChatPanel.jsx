@@ -3,19 +3,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { QuickPrompts } from './QuickPrompts';
 
-/**
- * AIChatPanel — Main AI chatbot panel for Pagixo OCR extension.
- *
- * Props:
- *   text {string} — OCR-extracted text passed from ResultViewer (used as fallback
- *                   if chrome.storage.session has no pagixoContext yet)
- *
- * Context is primarily read from chrome.storage.session key: pagixoContext
- * which is saved by the background script after every scan and contains:
- *   { extractedText, screenshotBase64, pageUrl, pageTitle, scanType, timestamp }
- */
+/** Main AI chat panel for the extension. */
 export function AIChatPanel({ text }) {
-  // ── State ─────────────────────────────────────────────────────────────────
+  // State.
   const [isOpen, setIsOpen]       = useState(false);
   const [messages, setMessages]   = useState([]);
   const [input, setInput]         = useState('');
@@ -26,12 +16,12 @@ export function AIChatPanel({ text }) {
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
 
-  // ── Load context + history when panel opens ───────────────────────────────
+  // Load context + history when panel opens.
   useEffect(() => {
     if (isOpen) {
       loadContextFromStorage();
       loadChatHistory();
-      // Small delay so the panel animation finishes before focusing
+      // Delay focus until the panel opens.
       setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [isOpen]);
@@ -74,12 +64,12 @@ export function AIChatPanel({ text }) {
     } catch { /* non-fatal — session storage may not be available in dev */ }
   }
 
-  // ── Auto-scroll to latest message ─────────────────────────────────────────
+  // Auto-scroll to latest message.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // ── Send a message ────────────────────────────────────────────────────────
+  // Send a message.
   const sendMessage = useCallback(async (questionOverride, meta) => {
     const rawQuestion = (questionOverride || input).trim();
     if (!rawQuestion || isLoading) return;
@@ -87,14 +77,14 @@ export function AIChatPanel({ text }) {
     setInput('');
     setError(null);
 
-    // Smart intent detection: augment form-fill queries with extra context hint
+    // Form-fill hint for visible page scans.
     const FORM_KEYWORDS = ['fill', 'form', 'input', 'field', 'complete', 'submit'];
     const isFormQuery = FORM_KEYWORDS.some(k => rawQuestion.toLowerCase().includes(k));
     let question = (isFormQuery && context?.scanType === 'visible_page')
       ? `${rawQuestion}\n\n[Context: This appears to be a form page. Please list each form field with a clear instruction on what to enter.]`
       : rawQuestion;
 
-    // Apply clean, student-friendly math formatting only for Solve prompt
+    // Apply clean, student-friendly math formatting only for Solve prompt.
     if (meta?.label === 'Solve') {
       question += (
         "\n\n[Formatting: Provide a clean, step-by-step solution. Use aligned equations and avoid narrative filler. " +
@@ -102,13 +92,13 @@ export function AIChatPanel({ text }) {
       );
     }
 
-    const userMsg = { role: 'user', content: rawQuestion }; // show raw in UI
+    const userMsg = { role: 'user', content: rawQuestion };
     const updatedMsgs = [...messages, userMsg];
     setMessages(updatedMsgs);
     setIsLoading(true);
 
     try {
-      // Build history for API (exclude system/welcome messages, cap at 8 turns)
+      // Build history for API (exclude system/welcome messages, cap at 8 turns).
       const historyForApi = updatedMsgs
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .slice(-9, -1) // last 8 turns before the just-added user msg
@@ -116,7 +106,7 @@ export function AIChatPanel({ text }) {
 
       const payload = {
         action: 'askAI',
-        question, // augmented question sent to AI
+        question,
         context: context?.extractedText || text || '',
         history: historyForApi,
         pageUrl: context?.pageUrl || '',
@@ -152,16 +142,16 @@ export function AIChatPanel({ text }) {
     }
   }, [input, messages, context, text, isLoading]);
 
-  // ── Keyboard handler ──────────────────────────────────────────────────────
+  // Keyboard handler.
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
-    // Shift+Enter → natural textarea newline (do nothing)
+    // Shift+Enter leaves a newline.
   }
 
-  // ── Clear chat ────────────────────────────────────────────────────────────
+  // Clear chat.
   async function clearChat() {
     const resetMsg = [{ role: 'assistant', content: '🔄 Chat cleared. How can I help you?' }];
     setMessages(resetMsg);
@@ -169,7 +159,7 @@ export function AIChatPanel({ text }) {
     try { await chrome.storage.session.remove('pagixoChatHistory'); } catch {}
   }
 
-  // ── Header badge: shows scan type + word count ────────────────────────────
+  // Header badge: scan type + word count.
   function getContextBadge() {
     if (!context?.extractedText) return { label: 'No scan yet', color: '#888' };
     const words = context.extractedText.trim().split(/\s+/).length;
@@ -184,11 +174,11 @@ export function AIChatPanel({ text }) {
 
   const badge = getContextBadge();
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Render.
   return (
     <div className="px-ai-panel" data-open={isOpen}>
 
-      {/* ── Collapsible Header ── */}
+      {/* Collapsible header */}
       <button
         className="px-ai-panel__header"
         onClick={() => setIsOpen(o => !o)}
@@ -205,11 +195,11 @@ export function AIChatPanel({ text }) {
         <span className="px-ai-panel__chevron">{isOpen ? '▲' : '▼'}</span>
       </button>
 
-      {/* ── Body (only rendered when open) ── */}
+      {/* Body (rendered only when open) */}
       {isOpen && (
         <div className="px-ai-panel__body">
 
-          {/* Quick prompt chips */}
+          {/* Quick prompts */}
           <QuickPrompts
             onSelect={(prompt, meta) => sendMessage(prompt, meta)}
             disabled={isLoading}
@@ -229,7 +219,7 @@ export function AIChatPanel({ text }) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input bar */}
+          {/* Input */}
           <div className="px-ai-panel__input-row">
             <textarea
               ref={inputRef}

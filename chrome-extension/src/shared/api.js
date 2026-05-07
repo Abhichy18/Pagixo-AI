@@ -1,20 +1,16 @@
 /**
- * Pagixo OCR — Shared API Client (Security Hardened)
- *
- * Provides typed, resilient functions for communicating with
- * the FastAPI backend. Includes request signing, error sanitization,
- * and configurable timeouts.
+ * Shared API client.
  */
 
 import { ENDPOINTS, BRAND } from './constants.js';
 
-// ─── Security Defaults ───────────────────────────────────────
+// Timeouts.
 const DEFAULT_TIMEOUT_MS = 30_000;  // 30s for OCR (large PDFs can be slow)
 const HEALTH_TIMEOUT_MS = 3_000;
 const HISTORY_TIMEOUT_MS = 5_000;
 const UPLOAD_TIMEOUT_MS = 120_000;  // 2min for very large files
 
-/** Standard headers for all requests (client identification) */
+/** Standard headers for all requests. */
 function getSecureHeaders() {
   return {
     'X-Client-Version': BRAND.VERSION,
@@ -22,13 +18,13 @@ function getSecureHeaders() {
   };
 }
 
-/** Sanitize error messages — never expose raw server internals to UI */
+/** Sanitize error messages for UI. */
 function sanitizeError(raw) {
   if (!raw) return 'An unknown error occurred';
 
   const str = typeof raw === 'string' ? raw : String(raw);
 
-  // Strip stack traces, file paths, and internal details
+  // Strip stack traces, file paths, and internal details.
   const stripped = str
     .replace(/\/[^\s]+\.(py|js|ts):\d+/g, '[internal]')     // file paths
     .replace(/Traceback[\s\S]*$/m, '')                        // Python tracebacks
@@ -36,7 +32,7 @@ function sanitizeError(raw) {
     .replace(/\b(password|secret|key|token)=[^\s&]*/gi, '$1=[REDACTED]')
     .trim();
 
-  // Cap length
+  // Cap length.
   if (stripped.length > 200) return stripped.substring(0, 197) + '...';
   return stripped || 'An unknown error occurred';
 }
@@ -81,9 +77,7 @@ export async function checkApiHealth(baseUrl) {
 /**
  * Upload a file (image/PDF) to the OCR API.
  *
- * For files > 1MB, uses XMLHttpRequest to provide upload progress.
- * For smaller files, uses fetch for simplicity.
- * All requests include X-Client-Version header.
+ * Uses XHR for large files to report progress.
  *
  * @param {File|Blob} file
  * @param {string} baseUrl
@@ -116,7 +110,7 @@ async function uploadWithFetch(url, formData, signal) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
-  // Chain external signal if provided
+  // Chain external signal if provided.
   if (signal) {
     signal.addEventListener('abort', () => controller.abort(), { once: true });
   }
@@ -172,7 +166,7 @@ function uploadWithXHR(url, formData, onProgress, signal) {
     xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
     xhr.addEventListener('timeout', () => reject(new Error('Upload timed out')));
 
-    // Set secure headers
+    // Set headers.
     const headers = getSecureHeaders();
 
     xhr.timeout = UPLOAD_TIMEOUT_MS;
@@ -207,7 +201,7 @@ export async function fetchHistory(baseUrl) {
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────
+// Helpers.
 
 function tryParseErrorMessage(body) {
   if (!body) return null;
@@ -219,12 +213,11 @@ function tryParseErrorMessage(body) {
   }
 }
 
-// Export sanitizer for use in other modules
+// Export sanitizer for use in other modules.
 export { sanitizeError };
 
 /**
- * Validate the extension configuration before making API calls.
- * Called by the popup on load to catch misconfigurations early.
+ * Validate extension configuration before making API calls.
  *
  * @param {object} config — { apiUrl: string }
  * @returns {{ valid: boolean, errors: string[] }}
@@ -232,7 +225,7 @@ export { sanitizeError };
 export function validateConfig(config = {}) {
   const errors = [];
 
-  // Check API URL is present
+  // Check API URL is present.
   if (!config.apiUrl || typeof config.apiUrl !== 'string') {
     errors.push('API URL is empty or not a string');
     return { valid: false, errors };
@@ -240,22 +233,22 @@ export function validateConfig(config = {}) {
 
   const url = config.apiUrl.trim();
 
-  // Check not empty after trim
+  // Check not empty after trim.
   if (url.length === 0) {
     errors.push('API URL is empty');
     return { valid: false, errors };
   }
 
-  // Check valid URL format
+  // Check valid URL format.
   try {
     const parsed = new URL(url);
 
-    // Must be http or https
+    // Must be http or https.
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       errors.push(`Invalid protocol "${parsed.protocol}" — must be http: or https:`);
     }
 
-    // Warn on non-localhost in dev
+    // Warn on non-localhost in dev.
     if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
       // Not an error, but worth noting — could be production
     }

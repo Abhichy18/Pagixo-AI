@@ -1,14 +1,4 @@
-"""
-Pagixo OCR API — FastAPI Bridge for the Chrome Extension.
-
-This is the main entrypoint for the FastAPI server that bridges
-the Chrome Extension to the existing OCR pipeline.
-
-Runs on port 8000 (Streamlit stays on 8501 — completely untouched).
-
-Usage:
-    uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
-"""
+"""FastAPI entrypoint for the OCR bridge."""
 
 import sys
 import os
@@ -19,17 +9,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-# ─── Path Setup ───────────────────────────────────────────────────────────────
-# Add project root to sys.path so we can import enhance_image.py and 
-# other root-level modules without modifying them.
+# Path setup so root modules (e.g., enhance_image.py) are importable.
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, PROJECT_ROOT)
 
-# Load .env from project root
+# Load .env from project root.
 from dotenv import load_dotenv
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"), override=True)
 
-# ─── Logging ──────────────────────────────────────────────────────────────────
+# Logging.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -37,27 +25,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("pagixo.api")
 
-# ─── App State ────────────────────────────────────────────────────────────────
+# App state.
 _startup_time: float = 0.0
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Lifespan context manager for startup/shutdown events.
-    
-    Startup:
-      - Log service info
-      - Record startup time for uptime tracking
-      - Verify API keys are available
-    
-    Shutdown:
-      - Clean up resources
-    """
+        """Startup/shutdown hooks."""
     global _startup_time
     _startup_time = time.time()
 
-    # Verify critical environment variables
+    # Verify critical environment variables.
     nvidia_key = os.getenv("NVIDIA_API_KEY")
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
 
@@ -81,8 +59,7 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 Pagixo OCR API shutting down...")
 
 
-# ─── FastAPI App ──────────────────────────────────────────────────────────────
-
+# FastAPI app.
 app = FastAPI(
     title="Pagixo OCR API",
     description=(
@@ -96,26 +73,21 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Mount CORS middleware
+# Mount CORS middleware.
 from api.middleware.cors import setup_cors
 setup_cors(app)
 
-# Include OCR and Chat routers
+# Include OCR and chat routers.
 from api.routers.ocr import router as ocr_router
 from api.routers.chat import router as chat_router
 app.include_router(ocr_router)
 app.include_router(chat_router)
 
 
-# ─── Health Endpoint ──────────────────────────────────────────────────────────
-
+# Health endpoint.
 @app.get("/health", tags=["System"])
 async def health_check():
-    """
-    Health check endpoint.
-    Returns service status, version, and uptime.
-    Used by the Chrome Extension to verify API availability.
-    """
+    """Health check for the extension."""
     uptime = round(time.time() - _startup_time, 2) if _startup_time else 0.0
     return JSONResponse(
         content={
@@ -129,7 +101,7 @@ async def health_check():
 
 @app.get("/", tags=["System"])
 async def root():
-    """Root endpoint — redirects to docs."""
+    """Root endpoint with basic links."""
     return {
         "message": "Pagixo OCR API is running",
         "docs": "/docs",
@@ -137,8 +109,7 @@ async def root():
     }
 
 
-# ─── Run directly (optional) ─────────────────────────────────────────────────
-
+# Run directly (optional).
 if __name__ == "__main__":
     import uvicorn
 

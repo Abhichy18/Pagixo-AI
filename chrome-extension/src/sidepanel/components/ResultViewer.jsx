@@ -6,10 +6,7 @@ import katex from 'katex';
 import renderMathInElement from 'katex/contrib/auto-render';
 import 'katex/dist/katex.min.css';
 
-/**
- * ResultViewer — OCR results with Raw/Markdown/LaTeX sub-tabs.
- * Features: find-in-text, metadata bar, copy/download, open in new tab.
- */
+/** OCR results viewer with raw/markdown/latex tabs. */
 export default function ResultViewer({ result }) {
   const [subTab, setSubTab] = useState('raw');
   const [copied, setCopied] = useState(false);
@@ -24,7 +21,7 @@ export default function ResultViewer({ result }) {
   const charCount = text.length;
   const lineCount = text.split('\n').length;
 
-  // Search match count
+  // Search match count.
   const matchCount = useMemo(() => {
     if (!searchQuery || searchQuery.length < 2) return 0;
     try {
@@ -33,7 +30,7 @@ export default function ResultViewer({ result }) {
     } catch { return 0; }
   }, [searchQuery, text]);
 
-  // Highlighted text for raw view
+  // Highlighted text for raw view.
   const highlightedHtml = useMemo(() => {
     if (!searchQuery || searchQuery.length < 2 || subTab !== 'raw') return null;
     try {
@@ -44,7 +41,7 @@ export default function ResultViewer({ result }) {
     } catch { return null; }
   }, [searchQuery, text, subTab]);
 
-  // Keyboard shortcut for search
+  // Keyboard shortcut for search.
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -61,7 +58,7 @@ export default function ResultViewer({ result }) {
     return () => document.removeEventListener('keydown', handler);
   }, [searchOpen]);
 
-  // Render KaTeX
+  // Render KaTeX.
   useEffect(() => {
     if (subTab === 'latex' && latexRef.current) {
       latexRef.current.textContent = text;
@@ -81,7 +78,7 @@ export default function ResultViewer({ result }) {
     }
   }, [subTab, text]);
 
-  // Render Markdown (sanitized) — also render math inside markdown
+  // Render markdown (sanitized) and inline math.
   useEffect(() => {
     if (subTab === 'markdown' && mdRef.current) {
       try {
@@ -162,7 +159,7 @@ export default function ResultViewer({ result }) {
         ))}
       </div>
 
-      {/* Sub-tabs + search toggle */}
+      {/* Sub-tabs + search */}
       <div className="flex items-center gap-1 px-1 mb-2">
         {subTabs.map((t) => (
           <button key={t.id} onClick={() => setSubTab(t.id)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
@@ -181,7 +178,7 @@ export default function ResultViewer({ result }) {
         </div>
       </div>
 
-      {/* Search bar */}
+      {/* Search */}
       {searchOpen && (
         <div className="flex items-center gap-2 px-1 mb-2 animate-fade">
           <div className="flex-1 flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg px-2.5 py-1.5 focus-within:border-amber-500/30">
@@ -198,7 +195,7 @@ export default function ResultViewer({ result }) {
         </div>
       )}
 
-      {/* Content area */}
+      {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto mb-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
         {subTab === 'raw' && (
           highlightedHtml ? (
@@ -206,9 +203,9 @@ export default function ResultViewer({ result }) {
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightedHtml) }} />
           ) : (
             <div className="flex flex-col">
-              {/* Rendered math preview — like Streamlit's "Rendered" tab */}
+              {/* Rendered math preview */}
               <MathPreview text={text} />
-              {/* Syntax-highlighted raw source */}
+              {/* Raw source */}
               <RawTextBlock text={text} />
             </div>
           )
@@ -221,7 +218,7 @@ export default function ResultViewer({ result }) {
         )}
       </div>
 
-      {/* Action buttons */}
+      {/* Actions */}
       <div className="flex gap-2 mb-2">
         <button onClick={handleCopy} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 active:scale-[0.97]
           ${copied ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/[0.04] text-indigo-300/60 border border-white/[0.06] hover:bg-white/[0.07] hover:text-indigo-300/90'}`}>
@@ -239,24 +236,21 @@ export default function ResultViewer({ result }) {
         </button>
       </div>
 
-      {/* Scan Another — Action Panel */}
+      {/* Scan another */}
       <ScanActionPanel />
 
-      {/* ── Pagixo AI Chat ── */}
+      {/* Pagixo AI chat */}
       <AIChatPanel text={text} />
     </div>
   );
 }
 
-/* ─── Math Preview — Rendered Equation Display ─────── */
+/* Math preview */
 function MathPreview({ text }) {
   const previewRef = useRef(null);
   const [renderOk, setRenderOk] = useState(false);
 
-  /**
-   * Smart detection: Only show rendered preview for short, pure math expressions.
-   * Skip for full documents, tables, long prose, etc.
-   */
+  /** Render only short, pure math expressions. */
   const shouldRender = useMemo(() => {
     const trimmed = text.trim();
 
