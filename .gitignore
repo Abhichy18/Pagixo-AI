@@ -19,7 +19,4 @@ corrections.jsonl
 *.tmp
 *.log
 
-# Local docs and prompts (do not commit)
-pagixo_ai_chat_guide.md
-pagixo_chrome_extension_master_guide.md
-prompts/
+

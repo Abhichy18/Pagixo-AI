@@ -31,7 +31,7 @@ _startup_time: float = 0.0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-        """Startup/shutdown hooks."""
+    """Startup/shutdown hooks."""
     global _startup_time
     _startup_time = time.time()
 
