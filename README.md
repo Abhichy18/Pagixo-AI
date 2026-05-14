@@ -101,10 +101,10 @@ Pagixo runs a **multimodal inference pipeline** across 4 vision models with auto
 
 | Model | Provider | Strength | Tier |
 |:---|:---|:---|:---|
-| `nemotron-ocr-v1` | NVIDIA API | General text, high speed | Primary |
-| `qwen-2.5-vl-72b` | OpenRouter | Math & LaTeX precision | Math-focused |
-| `nemotron-nano-12b-vl` | OpenRouter | Vision-language hybrid | Free fallback |
-| `baidu-qianfan-ocr-fast` | OpenRouter | Speed-optimized OCR | Free fallback |
+| `nemotron-ocr-v1` | API Provider | General text, high speed | Primary |
+| `qwen-2.5-vl-72b` | API Provider | Math & LaTeX precision | Math-focused |
+| `nemotron-nano-12b-vl` | API Provider | Vision-language hybrid | Free fallback |
+| `baidu-qianfan-ocr-fast` | API Provider | Speed-optimized OCR | Free fallback |
 
 **Smart Routing Logic:**
 - Subject-aware routing — math subjects auto-route to Qwen 2.5 VL
@@ -156,7 +156,7 @@ Not just *what* the text says — but *where* it is:
 - **Numbered badges** for easy reference (black background, green text)
 - **Resolution-independent** — coordinates normalized to 1000×1000
 - **RGBA alpha compositing** for non-destructive overlays
-- **Multi-format support** — handles both OpenRouter JSON and NVIDIA's `text_detections` format
+- **Multi-format support** — handles standard JSON and multiple `text_detections` formats
 - **4-stage JSON parsing fallback:** `ast.literal_eval` → `json.loads` → Regex parser → Error
 
 ---
@@ -167,7 +167,7 @@ After extracting text, you can **have a full conversation** with your document:
 
 | Capability | Detail |
 |:---|:---|
-| **Text Reasoning** | Meta Llama 3.1 8B via NVIDIA NIM |
+| **Text Reasoning** | Meta Llama 3.1 8B via Custom API |
 | **Vision Analysis** | Meta Llama 3.2 11B Vision for image-based Q&A |
 | **Chat History** | Thread-safe `deque(maxlen=50)` with full context |
 | **Preset Prompts** | "Summarize", "Solve step by step", "Explain", "Translate" |
@@ -300,11 +300,11 @@ graph TB
     subgraph Engine["🧠 AI Engine"]
         OCR[OCR Engine<br/>Multi-Model Pipeline]
         CV[OpenCV Pipeline<br/>4-Stage Enhancement]
-        CHAT[AI Chat Service<br/>NVIDIA NIM]
+        CHAT[AI Chat Service<br/>Cloud API]
     end
 
     subgraph Models["🤖 External AI Models"]
-        NV[NVIDIA Nemotron OCR v1]
+        NV[Nemotron OCR v1]
         QW[Qwen 2.5 VL 72B]
         NM[Nemotron Nano 12B VL]
         BD[Baidu Qianfan OCR]
@@ -363,7 +363,7 @@ pagixo-ai/
 │   │   ├── ocr.py                # /api/ocr + /api/history endpoints
 │   │   └── chat.py               # /api/chat endpoint
 │   ├── services/
-│   │   └── nvidia_nim.py         # NVIDIA NIM integration (Chat + Vision)
+│   │   └── api_client.py         # Cloud API integration (Chat + Vision)
 │   ├── middleware/
 │   │   └── cors.py               # CORS configuration
 │   ├── Dockerfile                # API container
@@ -413,7 +413,7 @@ pagixo-ai/
 | **OpenCV** | 4-stage image enhancement (CLAHE → Threshold → Deskew → Edge) |
 | **PyMuPDF (fitz)** | PDF → Image rendering at 200 DPI |
 | **Pillow (PIL)** | Image manipulation, bounding box rendering, alpha compositing |
-| **OpenAI SDK** | Unified client for OpenRouter + NVIDIA API calls |
+| **OpenAI SDK** | Unified client for standard external API calls |
 | **ThreadPoolExecutor** | Concurrent multi-page extraction (3 workers) |
 | **python-dotenv** | Environment variable management |
 
@@ -442,8 +442,8 @@ pagixo-ai/
 
 | Technology | Role |
 |:---|:---|
-| **NVIDIA NIM** | Chat API (Llama 3.1 8B + Llama 3.2 11B Vision) |
-| **OpenRouter** | Multi-model OCR routing (Qwen, Nemotron, Baidu) |
+| **Cloud API** | Chat API (Llama 3.1 8B + Llama 3.2 11B Vision) |
+| **Routing API** | Multi-model OCR routing (Qwen, Nemotron, Baidu) |
 | **Docker Compose** | Multi-service container orchestration |
 | **Structured Logging** | Timestamped logs with service-level namespacing |
 
@@ -461,7 +461,7 @@ Extract text from an image or PDF. Accepts `file` (required), `model`, `subject`
   "confidence": 0.94,
   "pages": 1,
   "processing_time_ms": 4200,
-  "model_used": "nvidia/nemotron-ocr-v1",
+  "model_used": "nemotron-ocr-v1",
   "filename": "lecture_notes.png"
 }
 ```
@@ -511,9 +511,8 @@ Pagixo implements **defense-in-depth** security across every layer:
 - Python 3.10+
 - Node.js 18+ (for Chrome Extension build)
 - Chrome browser
-- At least one API key:
-  - [NVIDIA NIM API Key](https://build.nvidia.com/)
-  - [OpenRouter API Key](https://openrouter.ai/)
+- Required API keys:
+  - Valid keys for the configured AI models
 
 ### 1. Clone & Setup
 
@@ -538,8 +537,8 @@ cp .env.example .env
 
 Edit `.env`:
 ```env
-NVIDIA_API_KEY=your_nvidia_nim_api_key_here
-OPENROUTER_API_KEY=your_openrouter_api_key_here
+PRIMARY_API_KEY=your_primary_api_key_here
+SECONDARY_API_KEY=your_fallback_api_key_here
 ```
 
 ### 3. Launch Services
