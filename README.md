@@ -40,7 +40,7 @@ It combines a **Chrome Extension**, **Streamlit Dashboard**, and **FastAPI backe
 > **Pagixo was built to end this.**
 
 <p align="center">
-  <img src="assets/pagixo_ocr_workflow.gif" alt="Pagixo OCR Workflow Demo" width="700"/>
+  <img src="assets/pagixo_demo_compressed.gif" alt="Pagixo OCR Workflow Demo" width="700"/>
 </p>
 
 ---
